@@ -217,8 +217,7 @@ Which one depends on whether you know your board:
   firmware. Much smaller, and a much faster first launch. The board picker only offers the
   board that is actually in the download.
 
-Do not install more than one. They are the same app, so they share one folder on the SD
-card and would re-unpack over each other on every launch.
+Do not install more than one - they all show up as the same app.
 
 > **First launch takes a while**, and longer for `-all`. The .fap carries its bundled
 > content (board firmware, the web bundle, the packs) and the Flipper unpacks it to the SD
