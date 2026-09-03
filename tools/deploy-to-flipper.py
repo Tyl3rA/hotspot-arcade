@@ -2,18 +2,24 @@
 """Deploy Hotspot Arcade to a Flipper Zero over USB (serial CLI).
 
 Uploads three things to the SD card, each verified by on-device md5:
-  - the built fap             -> /ext/apps/GPIO/hotspot_arcade.fap
-  - web bundle (web/dist/*)   -> /ext/apps_data/hotspot_arcade/web/<name>
+  - the built fap             -> /ext/apps/GPIO/<app_name>.fap
+  - web bundle (web/dist/*)   -> /ext/apps_data/<app_name>/web/<name>
       (the *.gz files AND manifest.json; the uncompressed index.html is skipped)
-  - content packs (*.txt)     -> /ext/apps_data/hotspot_arcade/packs/<game>/<name>
+  - content packs (*.txt)     -> /ext/apps_data/<app_name>/packs/<game>/<name>
       (one subdirectory per game under packs/, e.g. packs/trivia/*.txt)
+
+<app_name> is derived from the deployed .fap's filename (default: hotspot_arcade-all, matching the default build-fap.sh output).
 
 The ESP firmware bundle is NOT deployed here: it ships inside the .fap
 (fap_file_assets) and the loader extracts it to
 /ext/apps_assets/hotspot_arcade/firmware/ on launch, so the on-device flasher
 finds it with no SD setup. Build the fap with tools/build-fap.sh to bundle it.
 
-Usage: python3 tools/deploy-to-flipper.py --port /dev/cu.usbmodemflip_XXXX
+Usage: 
+  (default -all)
+  python3 tools/deploy-to-flipper.py --port /dev/cu.usbmodemflip_XXXX
+  (board specific)
+  python3 tools/deploy-to-flipper.py --port /dev/cu.usbmodemflip_XXXX --fap flipper/hotspot-arcade/dist/hotspot_arcade-s2.fap
 Requires: pyserial
 
 Only adds files; stale files left on the SD card from earlier sessions are not
@@ -31,12 +37,9 @@ import serial  # pyserial
 PROMPT = b">: "
 BLOCK = 4096  # small blocks keep the Flipper's per-write_chunk malloc tiny
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FAP = os.path.join(REPO, "flipper", "hotspot-arcade", "dist", "hotspot_arcade.fap")
+FAP = os.path.join(REPO, "flipper", "hotspot-arcade", "dist", "hotspot_arcade-all.fap")
 WEB_DIST = os.path.join(REPO, "web", "dist")
 PACKS = os.path.join(REPO, "packs")
-
-APP_DIR = "/ext/apps_data/hotspot_arcade"
-
 
 def read_until(s, marker, timeout=8):
     end = time.time() + timeout
@@ -129,13 +132,22 @@ def pack_files():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", required=True, help="Flipper serial port")
+    ap.add_argument("--fap", default=FAP, help=("Path to the .fap to deploy - defaulted to the -all variant"))
     args = ap.parse_args()
 
-    if not os.path.exists(FAP):
+    fap = args.fap
+    if not os.path.exists(fap):
         sys.exit(
-            f"fap not found: {FAP}\n"
+            f"fap not found: {fap}\n"
             "build it first: cd flipper/hotspot-arcade && ufbt"
+            " (or tools/build-fap.sh, optionally with the BOARD=s2|wroom|c5) arg"
         )
+
+    app_name = os.path.splitext(os.path.basename(fap))[0]
+    app_dir = f"/ext/apps_data/{app_name}"
+    remote_fap = f"/ext/apps/GPIO/{app_name}.fap"
+    print(f"==> deploying '{app_name}' -> {app_dir}")
+  
     web = web_files()
     if not web:
         sys.exit(
@@ -159,28 +171,28 @@ def main():
         for d in [
             "/ext/apps/GPIO",
             "/ext/apps_data",
-            APP_DIR,
-            f"{APP_DIR}/web",
-            f"{APP_DIR}/packs",
-            f"{APP_DIR}/logs",
+            app_dir,
+            f"{app_dir}/web",
+            f"{app_dir}/packs",
+            f"{app_dir}/logs",
         ]:
             cmd(s, f"storage mkdir {d}")
         made = set()
         for game, files in packs.items():
-            cmd(s, f"storage mkdir {APP_DIR}/packs/{game}")
+            cmd(s, f"storage mkdir {app_dir}/packs/{game}")
             for rel, _ in files:
                 sub = os.path.dirname(rel)  # "" or a language subdir
                 subpath = f"{game}/{sub}"
                 if sub and subpath not in made:
-                    cmd(s, f"storage mkdir {APP_DIR}/packs/{game}/{sub}")
+                    cmd(s, f"storage mkdir {app_dir}/packs/{game}/{sub}")
                     made.add(subpath)
 
-        jobs.append((FAP, "/ext/apps/GPIO/hotspot_arcade.fap"))
+        jobs.append((FAP, remote_fap))
         for p in web:
-            jobs.append((p, f"{APP_DIR}/web/{os.path.basename(p)}"))
+            jobs.append((p, f"{app_dir}/web/{os.path.basename(p)}"))
         for game, files in packs.items():
             for rel, p in files:
-                jobs.append((p, f"{APP_DIR}/packs/{game}/{rel}"))
+                jobs.append((p, f"{app_dir}/packs/{game}/{rel}"))
 
         for local, remote in jobs:
             ok = upload(s, local, remote)
