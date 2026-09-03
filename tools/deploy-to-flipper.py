@@ -187,7 +187,7 @@ def main():
                     cmd(s, f"storage mkdir {app_dir}/packs/{game}/{sub}")
                     made.add(subpath)
 
-        jobs.append((FAP, remote_fap))
+        jobs.append((fap, remote_fap))
         for p in web:
             jobs.append((p, f"{app_dir}/web/{os.path.basename(p)}"))
         for game, files in packs.items():
