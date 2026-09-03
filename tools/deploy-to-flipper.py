@@ -37,7 +37,7 @@ import serial  # pyserial
 PROMPT = b">: "
 BLOCK = 4096  # small blocks keep the Flipper's per-write_chunk malloc tiny
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FAP = os.path.join(REPO, "flipper", "hotspot-arcade", "dist", "hotspot_arcade-all.fap")
+DEFAULT_FAP = os.path.join(REPO, "flipper", "hotspot-arcade", "dist", "hotspot_arcade-all.fap")
 WEB_DIST = os.path.join(REPO, "web", "dist")
 PACKS = os.path.join(REPO, "packs")
 
@@ -132,21 +132,21 @@ def pack_files():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", required=True, help="Flipper serial port")
-    ap.add_argument("--fap", default=FAP, help=("Path to the .fap to deploy - defaulted to the -all variant"))
+    ap.add_argument("--fap", default=DEFAULT_FAP, help=("Path to the .fap to deploy - defaulted to the -all variant"))
     args = ap.parse_args()
 
-    fap = args.fap
-    if not os.path.exists(fap):
+    USER_FAP_PATH = args.fap
+    if not os.path.exists(USER_FAP_PATH):
         sys.exit(
-            f"fap not found: {fap}\n"
+            f"fap not found: {USER_FAP_PATH}\n"
             "build it first: cd flipper/hotspot-arcade && ufbt"
             " (or tools/build-fap.sh, optionally with the BOARD=s2|wroom|c5) arg"
         )
 
-    app_name = os.path.splitext(os.path.basename(fap))[0]
-    app_dir = f"/ext/apps_data/{app_name}"
-    remote_fap = f"/ext/apps/GPIO/{app_name}.fap"
-    print(f"==> deploying '{app_name}' -> {app_dir}")
+    APP_NAME = os.path.splitext(os.path.basename(USER_FAP_PATH))[0]
+    APP_DIR = f"/ext/apps_data/{APP_NAME}"
+    remote_fap = f"/ext/apps/GPIO/{APP_NAME}.fap"
+    print(f"==> deploying '{APP_NAME}' -> {APP_DIR}")
   
     web = web_files()
     if not web:
@@ -171,28 +171,28 @@ def main():
         for d in [
             "/ext/apps/GPIO",
             "/ext/apps_data",
-            app_dir,
-            f"{app_dir}/web",
-            f"{app_dir}/packs",
-            f"{app_dir}/logs",
+            APP_DIR,
+            f"{APP_DIR}/web",
+            f"{APP_DIR}/packs",
+            f"{APP_DIR}/logs",
         ]:
             cmd(s, f"storage mkdir {d}")
         made = set()
         for game, files in packs.items():
-            cmd(s, f"storage mkdir {app_dir}/packs/{game}")
+            cmd(s, f"storage mkdir {APP_DIR}/packs/{game}")
             for rel, _ in files:
                 sub = os.path.dirname(rel)  # "" or a language subdir
                 subpath = f"{game}/{sub}"
                 if sub and subpath not in made:
-                    cmd(s, f"storage mkdir {app_dir}/packs/{game}/{sub}")
+                    cmd(s, f"storage mkdir {APP_DIR}/packs/{game}/{sub}")
                     made.add(subpath)
 
-        jobs.append((fap, remote_fap))
+        jobs.append((USER_FAP_PATH, remote_fap))
         for p in web:
-            jobs.append((p, f"{app_dir}/web/{os.path.basename(p)}"))
+            jobs.append((p, f"{APP_DIR}/web/{os.path.basename(p)}"))
         for game, files in packs.items():
             for rel, p in files:
-                jobs.append((p, f"{app_dir}/packs/{game}/{rel}"))
+                jobs.append((p, f"{APP_DIR}/packs/{game}/{rel}"))
 
         for local, remote in jobs:
             ok = upload(s, local, remote)
