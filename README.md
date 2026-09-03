@@ -279,11 +279,18 @@ arduino-cli compile --fqbn esp32:esp32:esp32c5:PartitionScheme=huge_app,CDCOnBoo
 **3. Flipper app** — use the wrapper, not bare `ufbt`: it refreshes the bundled firmware
 images, web bundle, and content packs inside `assets/` before packaging.
 ```sh
-tools/build-fap.sh                         # -> dist/hotspot_arcade.fap
+tools/build-fap.sh                         # -> dist/hotspot_arcade-all.fap
 python3 tools/deploy-to-flipper.py --port /dev/cu.usbmodemflip_XXXX
 ```
+
+To build board specific .faps with this method, use this syntax.
+```sh
+BOARD=wroom tools/build-fap.sh              # -> dist/hotspot_arcade-wroom.fap
+python3 tools/deploy-to-flipper.py --port /dev/cu.usbmodemflip_XXXX --fap flipper/hotspot-arcade/dist/hotspot_arcade-wroom.fap
+```
+
 The deploy script pushes the fap to `/ext/apps/GPIO/` and your working copies of the web
-bundle and content packs to `/ext/apps_data/hotspot_arcade/`, where they override the
+bundle and content packs to `/ext/apps_data/[fap_name]/`, where they override the
 bundled ones — so you can iterate on the web client without rebuilding the fap.
 
 ## Development
